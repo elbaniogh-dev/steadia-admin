@@ -85,6 +85,61 @@ export default function UserDetailsPage() {
     return new Date(isoString).toLocaleString();
   };
 
+  // ---------- CSV export ----------
+
+  const escapeCsvValue = (value) => {
+    const str = value === null || value === undefined ? "" : String(value);
+    if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+      return '"' + str.replace(/"/g, '""') + '"';
+    }
+    return str;
+  };
+
+  const downloadCsv = (filename, headers, rows) => {
+    const headerLine = headers.map(escapeCsvValue).join(",");
+    const dataLines = rows.map((row) => row.map(escapeCsvValue).join(","));
+    const csvContent = [headerLine, ...dataLines].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportTransactionsCsv = () => {
+    const headers = ["Date", "Type", "Description", "Amount", "Category"];
+    const rows = transactions.map((t) => [
+      formatIsoDate(t.date),
+      t.type || "",
+      t.description || "",
+      t.amount ?? "",
+      t.category || "",
+    ]);
+    downloadCsv(`${user.email || userId}_transactions.csv`, headers, rows);
+  };
+
+  const exportStockCsv = () => {
+    const headers = ["Name", "Quantity", "Cost Price", "Selling Price"];
+    const rows = stockItems.map((s) => [
+      s.name || "",
+      s.quantity ?? "",
+      s.costPrice ?? "",
+      s.sellingPrice ?? "",
+    ]);
+    downloadCsv(`${user.email || userId}_stock.csv`, headers, rows);
+  };
+
+  const exportContactsCsv = () => {
+    const headers = ["Name", "Phone", "Balance"];
+    const rows = contacts.map((c) => [c.name || "", c.phone || "", c.balance ?? ""]);
+    downloadCsv(`${user.email || userId}_contacts.csv`, headers, rows);
+  };
+
   // ---------- Transactions ----------
 
   const startEditTx = (t) => {
@@ -287,9 +342,19 @@ export default function UserDetailsPage() {
 
       {/* Transactions */}
       <section className="mb-10">
-        <h2 className="text-lg font-semibold mb-3">
-          Transactions ({transactions.length})
-        </h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold">
+            Transactions ({transactions.length})
+          </h2>
+          {transactions.length > 0 && (
+            <button
+              onClick={exportTransactionsCsv}
+              className="text-sm text-neutral-400 hover:text-white border border-neutral-700 px-3 py-1.5 rounded-lg"
+            >
+              Export CSV
+            </button>
+          )}
+        </div>
         {transactions.length === 0 ? (
           <p className="text-neutral-500 text-sm">No transactions.</p>
         ) : (
@@ -383,9 +448,19 @@ export default function UserDetailsPage() {
 
       {/* Stock */}
       <section className="mb-10">
-        <h2 className="text-lg font-semibold mb-3">
-          Stock Items ({stockItems.length})
-        </h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold">
+            Stock Items ({stockItems.length})
+          </h2>
+          {stockItems.length > 0 && (
+            <button
+              onClick={exportStockCsv}
+              className="text-sm text-neutral-400 hover:text-white border border-neutral-700 px-3 py-1.5 rounded-lg"
+            >
+              Export CSV
+            </button>
+          )}
+        </div>
         {stockItems.length === 0 ? (
           <p className="text-neutral-500 text-sm">No stock items.</p>
         ) : (
@@ -468,10 +543,20 @@ export default function UserDetailsPage() {
       </section>
 
       {/* Contacts */}
-      <section className="mb-10">
-        <h2 className="text-lg font-semibold mb-3">
-          Contacts ({contacts.length})
-        </h2>
+            <section className="mb-10">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold">
+            Contacts ({contacts.length})
+          </h2>
+          {contacts.length > 0 && (
+            <button
+              onClick={exportContactsCsv}
+              className="text-sm text-neutral-400 hover:text-white border border-neutral-700 px-3 py-1.5 rounded-lg"
+            >
+              Export CSV
+            </button>
+          )}
+        </div>
         {contacts.length === 0 ? (
           <p className="text-neutral-500 text-sm">No contacts.</p>
         ) : (
