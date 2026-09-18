@@ -12,6 +12,7 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import { logAction } from "@/lib/logAction";
 
 export default function UserDetailsPage() {
   const router = useRouter();
@@ -110,6 +111,14 @@ export default function UserDetailsPage() {
       amount: Number(txDraft.amount),
       category: txDraft.category,
     });
+    await logAction({
+      adminEmail: auth.currentUser?.email || "unknown",
+      action: "edit",
+      targetUserId: userId,
+      targetCollection: "transactions",
+      targetDocId: id,
+      details: `Edited transaction: ${txDraft.description} (${txDraft.amount})`,
+    });
     setEditingTxId(null);
     setTxDraft({});
     fetchAll();
@@ -117,7 +126,16 @@ export default function UserDetailsPage() {
 
   const deleteTx = async (id) => {
     if (!confirm("Delete this transaction? This cannot be undone.")) return;
+    const tx = transactions.find((t) => t.id === id);
     await deleteDoc(doc(db, "users", userId, "transactions", id));
+    await logAction({
+      adminEmail: auth.currentUser?.email || "unknown",
+      action: "delete",
+      targetUserId: userId,
+      targetCollection: "transactions",
+      targetDocId: id,
+      details: tx ? `Deleted transaction: ${tx.description} (${tx.amount})` : "Deleted transaction",
+    });
     fetchAll();
   };
 
@@ -145,6 +163,14 @@ export default function UserDetailsPage() {
       costPrice: Number(stockDraft.costPrice),
       sellingPrice: Number(stockDraft.sellingPrice),
     });
+    await logAction({
+      adminEmail: auth.currentUser?.email || "unknown",
+      action: "edit",
+      targetUserId: userId,
+      targetCollection: "stock_items",
+      targetDocId: id,
+      details: `Edited stock item: ${stockDraft.name}`,
+    });
     setEditingStockId(null);
     setStockDraft({});
     fetchAll();
@@ -152,7 +178,16 @@ export default function UserDetailsPage() {
 
   const deleteStock = async (id) => {
     if (!confirm("Delete this stock item? This cannot be undone.")) return;
+    const stockItem = stockItems.find((s) => s.id === id);
     await deleteDoc(doc(db, "users", userId, "stock_items", id));
+    await logAction({
+      adminEmail: auth.currentUser?.email || "unknown",
+      action: "delete",
+      targetUserId: userId,
+      targetCollection: "stock_items",
+      targetDocId: id,
+      details: stockItem ? `Deleted stock item: ${stockItem.name}` : "Deleted stock item",
+    });
     fetchAll();
   };
 
@@ -178,6 +213,14 @@ export default function UserDetailsPage() {
       phone: contactDraft.phone,
       balance: Number(contactDraft.balance),
     });
+    await logAction({
+      adminEmail: auth.currentUser?.email || "unknown",
+      action: "edit",
+      targetUserId: userId,
+      targetCollection: "contacts",
+      targetDocId: id,
+      details: `Edited contact: ${contactDraft.name}`,
+    });
     setEditingContactId(null);
     setContactDraft({});
     fetchAll();
@@ -185,7 +228,16 @@ export default function UserDetailsPage() {
 
   const deleteContact = async (id) => {
     if (!confirm("Delete this contact? This cannot be undone.")) return;
+    const contact = contacts.find((c) => c.id === id);
     await deleteDoc(doc(db, "users", userId, "contacts", id));
+    await logAction({
+      adminEmail: auth.currentUser?.email || "unknown",
+      action: "delete",
+      targetUserId: userId,
+      targetCollection: "contacts",
+      targetDocId: id,
+      details: contact ? `Deleted contact: ${contact.name}` : "Deleted contact",
+    });
     fetchAll();
   };
 

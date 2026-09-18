@@ -167,6 +167,14 @@ export default function DashboardPage() {
               Manage Admins
             </button>
           )}
+          {isOwner && (
+            <button
+              onClick={() => router.push("/dashboard/logs")}
+              className="text-sm text-neutral-400 hover:text-white border border-neutral-700 px-4 py-2 rounded-lg"
+            >
+              View Logs
+            </button>
+          )}
           <button
             onClick={handleSignOut}
             className="text-sm text-neutral-400 hover:text-white border border-neutral-700 px-4 py-2 rounded-lg"
