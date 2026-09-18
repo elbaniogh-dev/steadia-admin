@@ -139,6 +139,14 @@ export default function DashboardPage() {
     return diffMs < 60000;
   };
 
+  const INACTIVE_DAYS = 14;
+
+  const isInactive = (lastSeen) => {
+    if (!lastSeen) return true;
+    const diffMs = Date.now() - lastSeen.toDate().getTime();
+    return diffMs > INACTIVE_DAYS * 24 * 60 * 60 * 1000;
+  };
+
   if (checkingAuth) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -164,6 +172,12 @@ export default function DashboardPage() {
             className="text-sm text-neutral-400 hover:text-white border border-neutral-700 px-4 py-2 rounded-lg"
           >
             Analytics
+          </button>
+          <button
+            onClick={() => router.push("/dashboard/inactive")}
+            className="text-sm text-neutral-400 hover:text-white border border-neutral-700 px-4 py-2 rounded-lg"
+          >
+            Inactive Users
           </button>
           {isOwner && (
             <button
@@ -251,6 +265,11 @@ export default function DashboardPage() {
                         }`}
                       ></span>
                       {isOnline(user.lastActive) ? "Online" : "Offline"}
+                      {isInactive(user.lastSeen) && (
+                        <span className="ml-2 text-xs bg-orange-900/40 text-orange-400 px-2 py-0.5 rounded-full">
+                          Inactive
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">{formatDate(user.createdAt)}</td>
                     <td className="px-4 py-3">{formatDate(user.lastSeen)}</td>
