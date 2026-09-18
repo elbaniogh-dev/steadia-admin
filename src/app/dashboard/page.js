@@ -26,6 +26,7 @@ export default function DashboardPage() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [isOwner, setIsOwner] = useState(false);
   const [totalCount, setTotalCount] = useState(null);
+  const [error, setError] = useState("");
 
   const [pageCursors, setPageCursors] = useState([null]);
   const [currentPage, setCurrentPage] = useState(0);
@@ -35,6 +36,7 @@ export default function DashboardPage() {
   const [searchActive, setSearchActive] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -42,9 +44,13 @@ export default function DashboardPage() {
         router.push("/");
         return;
       }
-      const adminSnap = await getDoc(doc(db, "admins", user.uid));
-      if (adminSnap.exists() && adminSnap.data().role === "owner") {
-        setIsOwner(true);
+      try {
+        const adminSnap = await getDoc(doc(db, "admins", user.uid));
+        if (adminSnap.exists() && adminSnap.data().role === "owner") {
+          setIsOwner(true);
+        }
+      } catch (err) {
+        setError("Failed to verify admin access. Try refreshing the page.");
       }
       setCheckingAuth(false);
     });
@@ -53,39 +59,43 @@ export default function DashboardPage() {
 
   const loadPage = async (pageIndex, cursorsOverride) => {
     setLoading(true);
-    const cursors = cursorsOverride || pageCursors;
-    const cursor = cursors[pageIndex];
+    setError("");
+    try {
+      const cursors = cursorsOverride || pageCursors;
+      const cursor = cursors[pageIndex];
 
-    const constraints = [orderBy("createdAt", "desc")];
-    if (cursor) constraints.push(startAfter(cursor));
-    constraints.push(limit(PAGE_SIZE + 1));
+      const constraints = [orderBy("createdAt", "desc")];
+      if (cursor) constraints.push(startAfter(cursor));
+      constraints.push(limit(PAGE_SIZE + 1));
 
-    const snap = await getDocs(query(collection(db, "users"), ...constraints));
-    const docs = snap.docs;
-    const more = docs.length > PAGE_SIZE;
-    const pageDocs = more ? docs.slice(0, PAGE_SIZE) : docs;
+      const snap = await getDocs(query(collection(db, "users"), ...constraints));
+      const docs = snap.docs;
+      const more = docs.length > PAGE_SIZE;
+      const pageDocs = more ? docs.slice(0, PAGE_SIZE) : docs;
 
-    setUsers(pageDocs.map((d) => ({ id: d.id, ...d.data() })));
-    setHasNextPage(more);
-    setCurrentPage(pageIndex);
+      setUsers(pageDocs.map((d) => ({ id: d.id, ...d.data() })));
+      setHasNextPage(more);
+      setCurrentPage(pageIndex);
 
-    if (pageDocs.length > 0) {
-      setPageCursors((prev) => {
-        const updated = [...prev];
-        updated[pageIndex + 1] = pageDocs[pageDocs.length - 1];
-        return updated;
-      });
+      if (pageDocs.length > 0) {
+        setPageCursors((prev) => {
+          const updated = [...prev];
+          updated[pageIndex + 1] = pageDocs[pageDocs.length - 1];
+          return updated;
+        });
+      }
+    } catch (err) {
+      setError("Failed to load users. Try refreshing the page.");
     }
-
     setLoading(false);
   };
 
   useEffect(() => {
     if (checkingAuth) return;
 
-    getCountFromServer(collection(db, "users")).then((snap) => {
-      setTotalCount(snap.data().count);
-    });
+    getCountFromServer(collection(db, "users"))
+      .then((snap) => setTotalCount(snap.data().count))
+      .catch(() => setTotalCount(null));
 
     loadPage(0, [null]);
 
@@ -102,18 +112,24 @@ export default function DashboardPage() {
 
     setSearching(true);
     setSearchActive(true);
+    setSearchError("");
 
-    const snap = await getDocs(
-      query(
-        collection(db, "users"),
-        orderBy("email"),
-        where("email", ">=", term),
-        where("email", "<=", term + "\uf8ff"),
-        limit(50)
-      )
-    );
+    try {
+      const snap = await getDocs(
+        query(
+          collection(db, "users"),
+          orderBy("email"),
+          where("email", ">=", term),
+          where("email", "<=", term + "\uf8ff"),
+          limit(50)
+        )
+      );
+      setSearchResults(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    } catch (err) {
+      setSearchError("Search failed. Try again.");
+      setSearchResults([]);
+    }
 
-    setSearchResults(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     setSearching(false);
   };
 
@@ -121,11 +137,16 @@ export default function DashboardPage() {
     setSearchInput("");
     setSearchActive(false);
     setSearchResults([]);
+    setSearchError("");
   };
 
   const handleSignOut = async () => {
-    await signOut(auth);
-    router.push("/");
+    try {
+      await signOut(auth);
+      router.push("/");
+    } catch (err) {
+      setError("Failed to sign out. Try again.");
+    }
   };
 
   const formatDate = (timestamp) => {
@@ -158,15 +179,15 @@ export default function DashboardPage() {
   const displayedUsers = searchActive ? searchResults : users;
 
   return (
-    <div className="min-h-screen bg-black text-white p-8">
-      <div className="flex justify-between items-center mb-6">
+    <div className="min-h-screen bg-black text-white p-4 sm:p-8">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold">Steadia Admin</h1>
           <p className="text-neutral-400 text-sm">
             {totalCount === null ? "Loading total..." : `${totalCount} total users`}
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <button
             onClick={() => router.push("/dashboard/analytics")}
             className="text-sm text-neutral-400 hover:text-white border border-neutral-700 px-4 py-2 rounded-lg"
@@ -204,13 +225,19 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSearch} className="flex gap-2 mb-6 max-w-md">
+      {error && (
+        <div className="bg-red-950 border border-red-800 text-red-300 text-sm rounded-lg px-4 py-3 mb-6">
+          {error}
+        </div>
+      )}
+
+      <form onSubmit={handleSearch} className="flex flex-wrap gap-2 mb-6 max-w-md">
         <input
           type="text"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           placeholder="Search by email..."
-          className="flex-1 bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-sm"
+          className="flex-1 min-w-[150px] bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-sm"
         />
         <button
           type="submit"
@@ -230,6 +257,12 @@ export default function DashboardPage() {
         )}
       </form>
 
+      {searchError && (
+        <div className="bg-red-950 border border-red-800 text-red-300 text-sm rounded-lg px-4 py-3 mb-6 max-w-md">
+          {searchError}
+        </div>
+      )}
+
       {loading && !searchActive ? (
         <p className="text-neutral-400">Loading...</p>
       ) : (
@@ -240,8 +273,8 @@ export default function DashboardPage() {
             </p>
           )}
 
-          <div className="border border-neutral-800 rounded-xl overflow-hidden">
-            <table className="w-full text-left text-sm">
+          <div className="border border-neutral-800 rounded-xl overflow-hidden overflow-x-auto">
+            <table className="w-full text-left text-sm min-w-[650px]">
               <thead className="bg-neutral-900 text-neutral-400">
                 <tr>
                   <th className="px-4 py-3">Email</th>
@@ -258,7 +291,7 @@ export default function DashboardPage() {
                     className="border-t border-neutral-800 hover:bg-neutral-900 cursor-pointer"
                   >
                     <td className="px-4 py-3">{user.email || "—"}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <span
                         className={`inline-block w-2 h-2 rounded-full mr-2 ${
                           isOnline(user.lastActive) ? "bg-green-500" : "bg-neutral-600"
@@ -271,8 +304,8 @@ export default function DashboardPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3">{formatDate(user.createdAt)}</td>
-                    <td className="px-4 py-3">{formatDate(user.lastSeen)}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">{formatDate(user.createdAt)}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">{formatDate(user.lastSeen)}</td>
                   </tr>
                 ))}
               </tbody>

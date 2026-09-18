@@ -21,10 +21,12 @@ export default function AdminsPage() {
   const [isOwner, setIsOwner] = useState(false);
   const [admins, setAdmins] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [emailInput, setEmailInput] = useState("");
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [removeError, setRemoveError] = useState("");
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -32,15 +34,17 @@ export default function AdminsPage() {
         router.push("/");
         return;
       }
-      const adminSnap = await getDoc(doc(db, "admins", currentUser.uid));
-      console.log("Signed-in uid:", currentUser.uid);
-      console.log("Admin doc exists:", adminSnap.exists());
-      console.log("Admin doc data:", adminSnap.data());
-      if (!adminSnap.exists() || adminSnap.data().role !== "owner") {
-        router.push("/dashboard");
-        return;
+      try {
+        const adminSnap = await getDoc(doc(db, "admins", currentUser.uid));
+        if (!adminSnap.exists() || adminSnap.data().role !== "owner") {
+          router.push("/dashboard");
+          return;
+        }
+        setIsOwner(true);
+      } catch (err) {
+        setLoadError("Failed to verify admin access. Try refreshing the page.");
+        setLoading(false);
       }
-      setIsOwner(true);
       setCheckingAuth(false);
     });
     return () => unsubscribe();
@@ -52,8 +56,13 @@ export default function AdminsPage() {
   }, [isOwner]);
 
   const fetchAdmins = async () => {
-    const snap = await getDocs(collection(db, "admins"));
-    setAdmins(snap.docs.map((d) => ({ uid: d.id, ...d.data() })));
+    setLoadError("");
+    try {
+      const snap = await getDocs(collection(db, "admins"));
+      setAdmins(snap.docs.map((d) => ({ uid: d.id, ...d.data() })));
+    } catch (err) {
+      setLoadError("Failed to load admin list. Try refreshing the page.");
+    }
     setLoading(false);
   };
 
@@ -102,8 +111,13 @@ export default function AdminsPage() {
     }
     if (!confirm("Remove this admin's access?")) return;
 
-    await deleteDoc(doc(db, "admins", uid));
-    fetchAdmins();
+    setRemoveError("");
+    try {
+      await deleteDoc(doc(db, "admins", uid));
+      fetchAdmins();
+    } catch (err) {
+      setRemoveError("Failed to remove admin. Try again.");
+    }
   };
 
   if (checkingAuth || loading) {
@@ -114,8 +128,22 @@ export default function AdminsPage() {
     );
   }
 
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center gap-4 p-4">
+        <p className="text-red-400 text-sm">{loadError}</p>
+        <button
+          onClick={fetchAdmins}
+          className="text-sm border border-neutral-700 px-4 py-2 rounded-lg hover:text-white text-neutral-400"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-black text-white p-8">
+    <div className="min-h-screen bg-black text-white p-4 sm:p-8">
       <button
         onClick={() => router.push("/dashboard")}
         className="text-sm text-neutral-400 hover:text-white mb-6"
@@ -125,18 +153,24 @@ export default function AdminsPage() {
 
       <h1 className="text-2xl font-bold mb-6">Manage Admins</h1>
 
+      {removeError && (
+        <div className="bg-red-950 border border-red-800 text-red-300 text-sm rounded-lg px-4 py-3 mb-6 max-w-md">
+          {removeError}
+        </div>
+      )}
+
       <form onSubmit={handleAddAdmin} className="mb-10 max-w-md">
         <label className="block text-sm text-neutral-400 mb-2">
           Add admin by email
         </label>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <input
             type="email"
             required
             value={emailInput}
             onChange={(e) => setEmailInput(e.target.value)}
             placeholder="someone@example.com"
-            className="flex-1 bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-sm"
+            className="flex-1 min-w-[150px] bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-sm"
           />
           <button
             type="submit"
@@ -155,8 +189,8 @@ export default function AdminsPage() {
       <h2 className="text-lg font-semibold mb-3">
         Current Admins ({admins.length})
       </h2>
-      <div className="border border-neutral-800 rounded-xl overflow-hidden">
-        <table className="w-full text-left text-sm">
+      <div className="border border-neutral-800 rounded-xl overflow-hidden overflow-x-auto">
+        <table className="w-full text-left text-sm min-w-[400px]">
           <thead className="bg-neutral-900 text-neutral-400">
             <tr>
               <th className="px-4 py-3">Email</th>

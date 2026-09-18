@@ -22,6 +22,7 @@ export default function LogsPage() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const [pageCursors, setPageCursors] = useState([null]);
   const [currentPage, setCurrentPage] = useState(0);
@@ -33,10 +34,15 @@ export default function LogsPage() {
         router.push("/");
         return;
       }
-      const adminSnap = await getDoc(doc(db, "admins", user.uid));
-      if (!adminSnap.exists() || adminSnap.data().role !== "owner") {
-        router.push("/dashboard");
-        return;
+      try {
+        const adminSnap = await getDoc(doc(db, "admins", user.uid));
+        if (!adminSnap.exists() || adminSnap.data().role !== "owner") {
+          router.push("/dashboard");
+          return;
+        }
+      } catch (err) {
+        setError("Failed to verify admin access. Try refreshing the page.");
+        setLoading(false);
       }
       setCheckingAuth(false);
     });
@@ -45,30 +51,34 @@ export default function LogsPage() {
 
   const loadPage = async (pageIndex, cursorsOverride) => {
     setLoading(true);
-    const cursors = cursorsOverride || pageCursors;
-    const cursor = cursors[pageIndex];
+    setError("");
+    try {
+      const cursors = cursorsOverride || pageCursors;
+      const cursor = cursors[pageIndex];
 
-    const constraints = [orderBy("timestamp", "desc")];
-    if (cursor) constraints.push(startAfter(cursor));
-    constraints.push(limit(PAGE_SIZE + 1));
+      const constraints = [orderBy("timestamp", "desc")];
+      if (cursor) constraints.push(startAfter(cursor));
+      constraints.push(limit(PAGE_SIZE + 1));
 
-    const snap = await getDocs(query(collection(db, "admin_logs"), ...constraints));
-    const docs = snap.docs;
-    const more = docs.length > PAGE_SIZE;
-    const pageDocs = more ? docs.slice(0, PAGE_SIZE) : docs;
+      const snap = await getDocs(query(collection(db, "admin_logs"), ...constraints));
+      const docs = snap.docs;
+      const more = docs.length > PAGE_SIZE;
+      const pageDocs = more ? docs.slice(0, PAGE_SIZE) : docs;
 
-    setLogs(pageDocs.map((d) => ({ id: d.id, ...d.data() })));
-    setHasNextPage(more);
-    setCurrentPage(pageIndex);
+      setLogs(pageDocs.map((d) => ({ id: d.id, ...d.data() })));
+      setHasNextPage(more);
+      setCurrentPage(pageIndex);
 
-    if (pageDocs.length > 0) {
-      setPageCursors((prev) => {
-        const updated = [...prev];
-        updated[pageIndex + 1] = pageDocs[pageDocs.length - 1];
-        return updated;
-      });
+      if (pageDocs.length > 0) {
+        setPageCursors((prev) => {
+          const updated = [...prev];
+          updated[pageIndex + 1] = pageDocs[pageDocs.length - 1];
+          return updated;
+        });
+      }
+    } catch (err) {
+      setError("Failed to load activity log. Try refreshing the page.");
     }
-
     setLoading(false);
   };
 
@@ -91,7 +101,7 @@ export default function LogsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-8">
+    <div className="min-h-screen bg-black text-white p-4 sm:p-8">
       <button
         onClick={() => router.push("/dashboard")}
         className="text-sm text-neutral-400 hover:text-white mb-6"
@@ -101,11 +111,23 @@ export default function LogsPage() {
 
       <h1 className="text-2xl font-bold mb-6">Admin Activity Log</h1>
 
+      {error && (
+        <div className="bg-red-950 border border-red-800 text-red-300 text-sm rounded-lg px-4 py-3 mb-6 flex flex-wrap items-center justify-between gap-3">
+          <span>{error}</span>
+          <button
+            onClick={() => loadPage(currentPage)}
+            className="text-sm border border-red-800 px-3 py-1.5 rounded-lg hover:text-white text-red-300"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {loading ? (
         <p className="text-neutral-400">Loading...</p>
-      ) : logs.length === 0 ? (
+      ) : logs.length === 0 && !error ? (
         <p className="text-neutral-500 text-sm">No activity logged yet.</p>
-      ) : (
+      ) : logs.length > 0 ? (
         <>
           <div className="border border-neutral-800 rounded-xl overflow-hidden overflow-x-auto">
             <table className="w-full text-left text-sm min-w-[800px]">
@@ -163,7 +185,7 @@ export default function LogsPage() {
             </button>
           </div>
         </>
-      )}
+      ) : null}
     </div>
   );
 }

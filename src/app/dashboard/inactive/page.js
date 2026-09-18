@@ -20,6 +20,7 @@ export default function InactiveUsersPage() {
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [users, setUsers] = useState([]);
 
   useEffect(() => {
@@ -40,20 +41,25 @@ export default function InactiveUsersPage() {
 
   const fetchInactive = async () => {
     setLoading(true);
-    const cutoff = Timestamp.fromDate(
-      new Date(Date.now() - INACTIVE_DAYS * 24 * 60 * 60 * 1000)
-    );
+    setError("");
+    try {
+      const cutoff = Timestamp.fromDate(
+        new Date(Date.now() - INACTIVE_DAYS * 24 * 60 * 60 * 1000)
+      );
 
-    const snap = await getDocs(
-      query(
-        collection(db, "users"),
-        where("lastSeen", "<=", cutoff),
-        orderBy("lastSeen", "asc"),
-        limit(200)
-      )
-    );
+      const snap = await getDocs(
+        query(
+          collection(db, "users"),
+          where("lastSeen", "<=", cutoff),
+          orderBy("lastSeen", "asc"),
+          limit(200)
+        )
+      );
 
-    setUsers(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setUsers(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    } catch (err) {
+      setError("Failed to load inactive users. Try refreshing the page.");
+    }
     setLoading(false);
   };
 
@@ -77,7 +83,7 @@ export default function InactiveUsersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-8">
+    <div className="min-h-screen bg-black text-white p-4 sm:p-8">
       <button
         onClick={() => router.push("/dashboard")}
         className="text-sm text-neutral-400 hover:text-white mb-6"
@@ -90,13 +96,25 @@ export default function InactiveUsersPage() {
         {INACTIVE_DAYS}+ days since last seen
       </p>
 
+      {error && (
+        <div className="bg-red-950 border border-red-800 text-red-300 text-sm rounded-lg px-4 py-3 mb-6 flex flex-wrap items-center justify-between gap-3">
+          <span>{error}</span>
+          <button
+            onClick={fetchInactive}
+            className="text-sm border border-red-800 px-3 py-1.5 rounded-lg hover:text-white text-red-300"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {loading ? (
         <p className="text-neutral-400">Loading...</p>
-      ) : users.length === 0 ? (
+      ) : users.length === 0 && !error ? (
         <p className="text-neutral-500 text-sm">No inactive users right now.</p>
-      ) : (
-        <div className="border border-neutral-800 rounded-xl overflow-hidden">
-          <table className="w-full text-left text-sm">
+      ) : users.length > 0 ? (
+        <div className="border border-neutral-800 rounded-xl overflow-hidden overflow-x-auto">
+          <table className="w-full text-left text-sm min-w-[500px]">
             <thead className="bg-neutral-900 text-neutral-400">
               <tr>
                 <th className="px-4 py-3">Email</th>
@@ -112,14 +130,14 @@ export default function InactiveUsersPage() {
                   className="border-t border-neutral-800 hover:bg-neutral-900 cursor-pointer"
                 >
                   <td className="px-4 py-3">{user.email || "—"}</td>
-                  <td className="px-4 py-3">{formatDate(user.lastSeen)}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">{formatDate(user.lastSeen)}</td>
                   <td className="px-4 py-3">{daysSince(user.lastSeen)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -26,8 +26,9 @@ export default function UserDetailsPage() {
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [actionError, setActionError] = useState("");
 
-  // Which row is currently being edited, per section, and the draft values.
   const [editingTxId, setEditingTxId] = useState(null);
   const [txDraft, setTxDraft] = useState({});
   const [editingStockId, setEditingStockId] = useState(null);
@@ -52,24 +53,28 @@ export default function UserDetailsPage() {
   }, [checkingAuth, userId]);
 
   const fetchAll = async () => {
-    const userSnap = await getDoc(doc(db, "users", userId));
-    if (!userSnap.exists()) {
-      setNotFound(true);
-      setLoading(false);
-      return;
+    setLoadError("");
+    try {
+      const userSnap = await getDoc(doc(db, "users", userId));
+      if (!userSnap.exists()) {
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
+      setUser({ id: userSnap.id, ...userSnap.data() });
+
+      const [txSnap, stockSnap, contactSnap] = await Promise.all([
+        getDocs(collection(db, "users", userId, "transactions")),
+        getDocs(collection(db, "users", userId, "stock_items")),
+        getDocs(collection(db, "users", userId, "contacts")),
+      ]);
+
+      setTransactions(txSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setStockItems(stockSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setContacts(contactSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    } catch (err) {
+      setLoadError("Failed to load this user's data. Try refreshing the page.");
     }
-    setUser({ id: userSnap.id, ...userSnap.data() });
-
-    const [txSnap, stockSnap, contactSnap] = await Promise.all([
-      getDocs(collection(db, "users", userId, "transactions")),
-      getDocs(collection(db, "users", userId, "stock_items")),
-      getDocs(collection(db, "users", userId, "contacts")),
-    ]);
-
-    setTransactions(txSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    setStockItems(stockSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    setContacts(contactSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-
     setLoading(false);
   };
 
@@ -78,8 +83,6 @@ export default function UserDetailsPage() {
     return timestamp.toDate().toLocaleString();
   };
 
-  // Transaction dates are stored as plain ISO text strings (Steadia's
-  // toMap()/fromMap() pattern), not Firestore's native timestamp type.
   const formatIsoDate = (isoString) => {
     if (!isoString) return "—";
     return new Date(isoString).toLocaleString();
@@ -143,6 +146,7 @@ export default function UserDetailsPage() {
   // ---------- Transactions ----------
 
   const startEditTx = (t) => {
+    setActionError("");
     setEditingTxId(t.id);
     setTxDraft({
       date: t.date || "",
@@ -159,44 +163,55 @@ export default function UserDetailsPage() {
   };
 
   const saveEditTx = async (id) => {
-    await updateDoc(doc(db, "users", userId, "transactions", id), {
-      date: txDraft.date,
-      type: txDraft.type,
-      description: txDraft.description,
-      amount: Number(txDraft.amount),
-      category: txDraft.category,
-    });
-    await logAction({
-      adminEmail: auth.currentUser?.email || "unknown",
-      action: "edit",
-      targetUserId: userId,
-      targetCollection: "transactions",
-      targetDocId: id,
-      details: `Edited transaction: ${txDraft.description} (${txDraft.amount})`,
-    });
-    setEditingTxId(null);
-    setTxDraft({});
-    fetchAll();
+    setActionError("");
+    try {
+      await updateDoc(doc(db, "users", userId, "transactions", id), {
+        date: txDraft.date,
+        type: txDraft.type,
+        description: txDraft.description,
+        amount: Number(txDraft.amount),
+        category: txDraft.category,
+      });
+      await logAction({
+        adminEmail: auth.currentUser?.email || "unknown",
+        action: "edit",
+        targetUserId: userId,
+        targetCollection: "transactions",
+        targetDocId: id,
+        details: `Edited transaction: ${txDraft.description} (${txDraft.amount})`,
+      });
+      setEditingTxId(null);
+      setTxDraft({});
+      fetchAll();
+    } catch (err) {
+      setActionError("Failed to save transaction. Try again.");
+    }
   };
 
   const deleteTx = async (id) => {
     if (!confirm("Delete this transaction? This cannot be undone.")) return;
-    const tx = transactions.find((t) => t.id === id);
-    await deleteDoc(doc(db, "users", userId, "transactions", id));
-    await logAction({
-      adminEmail: auth.currentUser?.email || "unknown",
-      action: "delete",
-      targetUserId: userId,
-      targetCollection: "transactions",
-      targetDocId: id,
-      details: tx ? `Deleted transaction: ${tx.description} (${tx.amount})` : "Deleted transaction",
-    });
-    fetchAll();
+    setActionError("");
+    try {
+      const tx = transactions.find((t) => t.id === id);
+      await deleteDoc(doc(db, "users", userId, "transactions", id));
+      await logAction({
+        adminEmail: auth.currentUser?.email || "unknown",
+        action: "delete",
+        targetUserId: userId,
+        targetCollection: "transactions",
+        targetDocId: id,
+        details: tx ? `Deleted transaction: ${tx.description} (${tx.amount})` : "Deleted transaction",
+      });
+      fetchAll();
+    } catch (err) {
+      setActionError("Failed to delete transaction. Try again.");
+    }
   };
 
   // ---------- Stock items ----------
 
   const startEditStock = (s) => {
+    setActionError("");
     setEditingStockId(s.id);
     setStockDraft({
       name: s.name || "",
@@ -212,43 +227,54 @@ export default function UserDetailsPage() {
   };
 
   const saveEditStock = async (id) => {
-    await updateDoc(doc(db, "users", userId, "stock_items", id), {
-      name: stockDraft.name,
-      quantity: Number(stockDraft.quantity),
-      costPrice: Number(stockDraft.costPrice),
-      sellingPrice: Number(stockDraft.sellingPrice),
-    });
-    await logAction({
-      adminEmail: auth.currentUser?.email || "unknown",
-      action: "edit",
-      targetUserId: userId,
-      targetCollection: "stock_items",
-      targetDocId: id,
-      details: `Edited stock item: ${stockDraft.name}`,
-    });
-    setEditingStockId(null);
-    setStockDraft({});
-    fetchAll();
+    setActionError("");
+    try {
+      await updateDoc(doc(db, "users", userId, "stock_items", id), {
+        name: stockDraft.name,
+        quantity: Number(stockDraft.quantity),
+        costPrice: Number(stockDraft.costPrice),
+        sellingPrice: Number(stockDraft.sellingPrice),
+      });
+      await logAction({
+        adminEmail: auth.currentUser?.email || "unknown",
+        action: "edit",
+        targetUserId: userId,
+        targetCollection: "stock_items",
+        targetDocId: id,
+        details: `Edited stock item: ${stockDraft.name}`,
+      });
+      setEditingStockId(null);
+      setStockDraft({});
+      fetchAll();
+    } catch (err) {
+      setActionError("Failed to save stock item. Try again.");
+    }
   };
 
   const deleteStock = async (id) => {
     if (!confirm("Delete this stock item? This cannot be undone.")) return;
-    const stockItem = stockItems.find((s) => s.id === id);
-    await deleteDoc(doc(db, "users", userId, "stock_items", id));
-    await logAction({
-      adminEmail: auth.currentUser?.email || "unknown",
-      action: "delete",
-      targetUserId: userId,
-      targetCollection: "stock_items",
-      targetDocId: id,
-      details: stockItem ? `Deleted stock item: ${stockItem.name}` : "Deleted stock item",
-    });
-    fetchAll();
+    setActionError("");
+    try {
+      const stockItem = stockItems.find((s) => s.id === id);
+      await deleteDoc(doc(db, "users", userId, "stock_items", id));
+      await logAction({
+        adminEmail: auth.currentUser?.email || "unknown",
+        action: "delete",
+        targetUserId: userId,
+        targetCollection: "stock_items",
+        targetDocId: id,
+        details: stockItem ? `Deleted stock item: ${stockItem.name}` : "Deleted stock item",
+      });
+      fetchAll();
+    } catch (err) {
+      setActionError("Failed to delete stock item. Try again.");
+    }
   };
 
   // ---------- Contacts ----------
 
   const startEditContact = (c) => {
+    setActionError("");
     setEditingContactId(c.id);
     setContactDraft({
       name: c.name || "",
@@ -263,37 +289,47 @@ export default function UserDetailsPage() {
   };
 
   const saveEditContact = async (id) => {
-    await updateDoc(doc(db, "users", userId, "contacts", id), {
-      name: contactDraft.name,
-      phone: contactDraft.phone,
-      balance: Number(contactDraft.balance),
-    });
-    await logAction({
-      adminEmail: auth.currentUser?.email || "unknown",
-      action: "edit",
-      targetUserId: userId,
-      targetCollection: "contacts",
-      targetDocId: id,
-      details: `Edited contact: ${contactDraft.name}`,
-    });
-    setEditingContactId(null);
-    setContactDraft({});
-    fetchAll();
+    setActionError("");
+    try {
+      await updateDoc(doc(db, "users", userId, "contacts", id), {
+        name: contactDraft.name,
+        phone: contactDraft.phone,
+        balance: Number(contactDraft.balance),
+      });
+      await logAction({
+        adminEmail: auth.currentUser?.email || "unknown",
+        action: "edit",
+        targetUserId: userId,
+        targetCollection: "contacts",
+        targetDocId: id,
+        details: `Edited contact: ${contactDraft.name}`,
+      });
+      setEditingContactId(null);
+      setContactDraft({});
+      fetchAll();
+    } catch (err) {
+      setActionError("Failed to save contact. Try again.");
+    }
   };
 
   const deleteContact = async (id) => {
     if (!confirm("Delete this contact? This cannot be undone.")) return;
-    const contact = contacts.find((c) => c.id === id);
-    await deleteDoc(doc(db, "users", userId, "contacts", id));
-    await logAction({
-      adminEmail: auth.currentUser?.email || "unknown",
-      action: "delete",
-      targetUserId: userId,
-      targetCollection: "contacts",
-      targetDocId: id,
-      details: contact ? `Deleted contact: ${contact.name}` : "Deleted contact",
-    });
-    fetchAll();
+    setActionError("");
+    try {
+      const contact = contacts.find((c) => c.id === id);
+      await deleteDoc(doc(db, "users", userId, "contacts", id));
+      await logAction({
+        adminEmail: auth.currentUser?.email || "unknown",
+        action: "delete",
+        targetUserId: userId,
+        targetCollection: "contacts",
+        targetDocId: id,
+        details: contact ? `Deleted contact: ${contact.name}` : "Deleted contact",
+      });
+      fetchAll();
+    } catch (err) {
+      setActionError("Failed to delete contact. Try again.");
+    }
   };
 
   // ---------- Render ----------
@@ -314,11 +350,25 @@ export default function UserDetailsPage() {
     );
   }
 
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center gap-4 p-4">
+        <p className="text-red-400 text-sm">{loadError}</p>
+        <button
+          onClick={fetchAll}
+          className="text-sm border border-neutral-700 px-4 py-2 rounded-lg hover:text-white text-neutral-400"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
   const inputClass =
     "bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-sm w-full";
 
   return (
-    <div className="min-h-screen bg-black text-white p-8">
+    <div className="min-h-screen bg-black text-white p-4 sm:p-8">
       <button
         onClick={() => router.push("/dashboard")}
         className="text-sm text-neutral-400 hover:text-white mb-6"
@@ -326,10 +376,16 @@ export default function UserDetailsPage() {
         ← Back to all users
       </button>
 
-      <h1 className="text-2xl font-bold mb-1">{user.email || "Unknown user"}</h1>
-      <p className="text-neutral-500 text-sm mb-8">User ID: {user.id}</p>
+      <h1 className="text-2xl font-bold mb-1 break-words">{user.email || "Unknown user"}</h1>
+      <p className="text-neutral-500 text-sm mb-8 break-all">User ID: {user.id}</p>
 
-      <div className="grid grid-cols-2 gap-4 mb-10 max-w-md">
+      {actionError && (
+        <div className="bg-red-950 border border-red-800 text-red-300 text-sm rounded-lg px-4 py-3 mb-6">
+          {actionError}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10 max-w-md">
         <div className="border border-neutral-800 rounded-xl p-4">
           <p className="text-neutral-500 text-xs mb-1">Signed Up</p>
           <p>{formatFirestoreDate(user.createdAt)}</p>
@@ -543,7 +599,7 @@ export default function UserDetailsPage() {
       </section>
 
       {/* Contacts */}
-            <section className="mb-10">
+      <section className="mb-10">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold">
             Contacts ({contacts.length})
