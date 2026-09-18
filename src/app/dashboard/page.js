@@ -159,6 +159,12 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex gap-3">
+          <button
+            onClick={() => router.push("/dashboard/analytics")}
+            className="text-sm text-neutral-400 hover:text-white border border-neutral-700 px-4 py-2 rounded-lg"
+          >
+            Analytics
+          </button>
           {isOwner && (
             <button
               onClick={() => router.push("/dashboard/admins")}
