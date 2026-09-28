@@ -5,12 +5,53 @@ import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, getDocs } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import Sidebar from "@/components/Sidebar";
+import { Users, Receipt, Wallet, Package, Boxes, Contact } from "lucide-react";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+
+const SIGNUP_DAYS = 30;
+
+const buildSignupSeries = (userDocs) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const buckets = [];
+  const indexByKey = {};
+
+  for (let i = SIGNUP_DAYS - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    indexByKey[d.toDateString()] = buckets.length;
+    buckets.push({
+      label: d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
+      signups: 0,
+    });
+  }
+
+  userDocs.forEach((d) => {
+    const ts = d.data().createdAt;
+    if (!ts || !ts.toDate) return;
+    const key = ts.toDate().toDateString();
+    if (key in indexByKey) buckets[indexByKey[key]].signups++;
+  });
+
+  return buckets;
+};
 
 export default function AnalyticsPage() {
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [signupSeries, setSignupSeries] = useState([]);
   const [stats, setStats] = useState({
     userCount: 0,
     txCount: 0,
@@ -82,6 +123,7 @@ export default function AnalyticsPage() {
         stockValue,
         contactCount,
       });
+      setSignupSeries(buildSignupSeries(usersSnap.docs));
     } catch (err) {
       setError("Failed to compute analytics. Try refreshing the page.");
     }
@@ -94,65 +136,132 @@ export default function AnalyticsPage() {
 
   if (checkingAuth) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+      <div className="min-h-screen bg-[#0a0b0f] text-slate-100 flex items-center justify-center">
         Checking access...
       </div>
     );
   }
 
+  const cards = [
+    { label: "Total Users", value: stats.userCount, icon: Users },
+    { label: "Total Transactions", value: stats.txCount, icon: Receipt },
+    { label: "Total Transaction Amount", value: formatNaira(stats.txTotal), icon: Wallet },
+    { label: "Total Stock Items", value: stats.stockCount, icon: Package },
+    { label: "Total Stock Value (cost)", value: formatNaira(stats.stockValue), icon: Boxes },
+    { label: "Total Contacts", value: stats.contactCount, icon: Contact },
+  ];
+
+  const recentSignups = signupSeries.reduce((sum, p) => sum + p.signups, 0);
+
   return (
-    <div className="min-h-screen bg-black text-white p-4 sm:p-8">
-      <button
-        onClick={() => router.push("/dashboard")}
-        className="text-sm text-neutral-400 hover:text-white mb-6"
-      >
-        ← Back to dashboard
-      </button>
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#0a0b0f] text-slate-100">
+      <Sidebar />
 
-      <h1 className="text-2xl font-bold mb-6">Analytics</h1>
-
-      {error && (
-        <div className="bg-red-950 border border-red-800 text-red-300 text-sm rounded-lg px-4 py-3 mb-6 flex flex-wrap items-center justify-between gap-3 max-w-4xl">
-          <span>{error}</span>
-          <button
-            onClick={computeStats}
-            className="text-sm border border-red-800 px-3 py-1.5 rounded-lg hover:text-white text-red-300"
-          >
-            Retry
-          </button>
+      <main className="flex-1 p-4 sm:p-8 min-w-0">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-50">Analytics</h1>
+          <p className="text-slate-500 text-sm mt-1">Totals across all users</p>
         </div>
-      )}
 
-      {loading ? (
-        <p className="text-neutral-400">Crunching numbers across all users...</p>
-      ) : !error ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl">
-          <div className="border border-neutral-800 rounded-xl p-5">
-            <p className="text-neutral-500 text-xs mb-1">Total Users</p>
-            <p className="text-2xl font-bold">{stats.userCount}</p>
+        {error && (
+          <div className="bg-rose-950/40 border border-rose-900/60 text-rose-300 text-sm rounded-xl px-4 py-3 mb-6 flex flex-wrap items-center justify-between gap-3">
+            <span>{error}</span>
+            <button
+              onClick={computeStats}
+              className="text-sm border border-rose-900/60 px-3 py-1.5 rounded-lg hover:text-rose-100 text-rose-300 transition-colors"
+            >
+              Retry
+            </button>
           </div>
-          <div className="border border-neutral-800 rounded-xl p-5">
-            <p className="text-neutral-500 text-xs mb-1">Total Transactions</p>
-            <p className="text-2xl font-bold">{stats.txCount}</p>
-          </div>
-          <div className="border border-neutral-800 rounded-xl p-5">
-            <p className="text-neutral-500 text-xs mb-1">Total Transaction Amount</p>
-            <p className="text-2xl font-bold break-words">{formatNaira(stats.txTotal)}</p>
-          </div>
-          <div className="border border-neutral-800 rounded-xl p-5">
-            <p className="text-neutral-500 text-xs mb-1">Total Stock Items</p>
-            <p className="text-2xl font-bold">{stats.stockCount}</p>
-          </div>
-          <div className="border border-neutral-800 rounded-xl p-5">
-            <p className="text-neutral-500 text-xs mb-1">Total Stock Value (cost)</p>
-            <p className="text-2xl font-bold break-words">{formatNaira(stats.stockValue)}</p>
-          </div>
-          <div className="border border-neutral-800 rounded-xl p-5">
-            <p className="text-neutral-500 text-xs mb-1">Total Contacts</p>
-            <p className="text-2xl font-bold">{stats.contactCount}</p>
-          </div>
-        </div>
-      ) : null}
+        )}
+
+        {loading ? (
+          <p className="text-slate-500">Crunching numbers across all users...</p>
+        ) : !error ? (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
+              {cards.map((card) => {
+                const Icon = card.icon;
+                return (
+                  <div
+                    key={card.label}
+                    className="bg-[#12141a]/60 border border-[#1f232b] rounded-2xl p-5"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-slate-500 text-xs uppercase tracking-wide">
+                        {card.label}
+                      </p>
+                      <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                        <Icon size={16} className="text-indigo-400" />
+                      </div>
+                    </div>
+                    <p className="text-2xl font-bold tracking-tight break-words text-slate-50">
+                      {card.value}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="bg-[#12141a]/60 border border-[#1f232b] rounded-2xl p-5">
+              <div className="flex flex-wrap items-end justify-between gap-2 mb-4">
+                <div>
+                  <h2 className="text-sm font-medium text-slate-100">New signups</h2>
+                  <p className="text-slate-500 text-xs mt-0.5">Last {SIGNUP_DAYS} days</p>
+                </div>
+                <p className="text-2xl font-bold tracking-tight text-slate-50">{recentSignups}</p>
+              </div>
+
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={signupSeries} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="signupFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#818cf8" stopOpacity={0.35} />
+                        <stop offset="100%" stopColor="#818cf8" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke="#1f232b" strokeDasharray="3 3" vertical={false} />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fill: "#64748b", fontSize: 11 }}
+                      tickLine={false}
+                      axisLine={false}
+                      interval="preserveStartEnd"
+                      minTickGap={24}
+                    />
+                    <YAxis
+                      allowDecimals={false}
+                      tick={{ fill: "#64748b", fontSize: 11 }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        background: "#0d0e13",
+                        border: "1px solid #1f232b",
+                        borderRadius: 12,
+                        fontSize: 12,
+                      }}
+                      labelStyle={{ color: "#94a3b8" }}
+                      itemStyle={{ color: "#818cf8" }}
+                      cursor={{ stroke: "#312e81" }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="signups"
+                      name="Signups"
+                      stroke="#6366f1"
+                      strokeWidth={2}
+                      fill="url(#signupFill)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </>
+        ) : null}
+      </main>
     </div>
   );
 }

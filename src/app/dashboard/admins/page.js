@@ -14,6 +14,7 @@ import {
   where,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import Sidebar from "@/components/Sidebar";
 
 export default function AdminsPage() {
   const router = useRouter();
@@ -122,102 +123,112 @@ export default function AdminsPage() {
 
   if (checkingAuth || loading) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        Loading...
-      </div>
-    );
-  }
-
-  if (loadError) {
-    return (
-      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center gap-4 p-4">
-        <p className="text-red-400 text-sm">{loadError}</p>
-        <button
-          onClick={fetchAdmins}
-          className="text-sm border border-neutral-700 px-4 py-2 rounded-lg hover:text-white text-neutral-400"
-        >
-          Retry
-        </button>
+      <div className="min-h-screen bg-[#0a0b0f] text-slate-100 flex items-center justify-center">
+        Checking access...
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-4 sm:p-8">
-      <button
-        onClick={() => router.push("/dashboard")}
-        className="text-sm text-neutral-400 hover:text-white mb-6"
-      >
-        ← Back to all users
-      </button>
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#0a0b0f] text-slate-100">
+      <Sidebar />
+      <main className="flex-1 p-4 sm:p-8 min-w-0">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-50">Manage Admins</h1>
+        <p className="text-slate-500 text-sm mt-1 mb-6">
+          Grant or revoke admin access to the dashboard
+        </p>
 
-      <h1 className="text-2xl font-bold mb-6">Manage Admins</h1>
-
-      {removeError && (
-        <div className="bg-red-950 border border-red-800 text-red-300 text-sm rounded-lg px-4 py-3 mb-6 max-w-md">
-          {removeError}
-        </div>
-      )}
-
-      <form onSubmit={handleAddAdmin} className="mb-10 max-w-md">
-        <label className="block text-sm text-neutral-400 mb-2">
-          Add admin by email
-        </label>
-        <div className="flex flex-wrap gap-2">
-          <input
-            type="email"
-            required
-            value={emailInput}
-            onChange={(e) => setEmailInput(e.target.value)}
-            placeholder="someone@example.com"
-            className="flex-1 min-w-[150px] bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-sm"
-          />
-          <button
-            type="submit"
-            disabled={submitting}
-            className="bg-white text-black px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
-          >
-            {submitting ? "Adding..." : "Add"}
-          </button>
-        </div>
-        {formError && <p className="text-red-400 text-sm mt-2">{formError}</p>}
-        {formSuccess && (
-          <p className="text-green-400 text-sm mt-2">{formSuccess}</p>
+        {loadError && (
+          <div className="bg-rose-950/40 border border-rose-900/60 text-rose-300 text-sm rounded-xl px-4 py-3 mb-6 flex flex-wrap items-center justify-between gap-3 max-w-md">
+            <span>{loadError}</span>
+            <button
+              onClick={fetchAdmins}
+              className="text-sm border border-rose-900/60 px-3 py-1.5 rounded-lg hover:text-rose-100 text-rose-300"
+            >
+              Retry
+            </button>
+          </div>
         )}
-      </form>
 
-      <h2 className="text-lg font-semibold mb-3">
-        Current Admins ({admins.length})
-      </h2>
-      <div className="border border-neutral-800 rounded-xl overflow-hidden overflow-x-auto">
-        <table className="w-full text-left text-sm min-w-[400px]">
-          <thead className="bg-neutral-900 text-neutral-400">
-            <tr>
-              <th className="px-4 py-3">Email</th>
-              <th className="px-4 py-3">Role</th>
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {admins.map((a) => (
-              <tr key={a.uid} className="border-t border-neutral-800">
-                <td className="px-4 py-3">{a.email}</td>
-                <td className="px-4 py-3 capitalize">{a.role}</td>
-                <td className="px-4 py-3 text-right">
-                  {a.role !== "owner" && (
-                    <button
-                      onClick={() => handleRemoveAdmin(a.uid, a.role)}
-                      className="text-red-400 hover:text-red-300 text-xs"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </td>
+        {removeError && (
+          <div className="bg-rose-950/40 border border-rose-900/60 text-rose-300 text-sm rounded-xl px-4 py-3 mb-6 max-w-md">
+            {removeError}
+          </div>
+        )}
+
+        <form
+          onSubmit={handleAddAdmin}
+          className="mb-10 max-w-md bg-[#12141a]/60 border border-[#1f232b] rounded-2xl p-5"
+        >
+          <label className="block text-sm text-slate-500 mb-2">
+            Add admin by email
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <input
+              type="email"
+              required
+              value={emailInput}
+              onChange={(e) => setEmailInput(e.target.value)}
+              placeholder="someone@example.com"
+              className="flex-1 min-w-[150px] bg-[#0d0e13] border border-[#1f232b] rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500/60 focus:ring-1 focus:ring-indigo-500/40"
+            />
+            <button
+              type="submit"
+              disabled={submitting}
+              className="bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-indigo-400"
+            >
+              {submitting ? "Adding..." : "Add"}
+            </button>
+          </div>
+          {formError && <p className="text-rose-400 text-sm mt-2">{formError}</p>}
+          {formSuccess && (
+            <p className="text-emerald-400 text-sm mt-2">{formSuccess}</p>
+          )}
+        </form>
+
+        <h2 className="text-lg font-semibold mb-3 text-slate-50">
+          Current Admins ({admins.length})
+        </h2>
+        <div className="rounded-2xl border border-[#1f232b] overflow-hidden overflow-x-auto">
+          <table className="w-full text-left text-sm min-w-[400px]">
+            <thead className="bg-[#12141a]/80 text-slate-500 text-xs uppercase">
+              <tr>
+                <th className="px-4 py-3 font-medium">Email</th>
+                <th className="px-4 py-3 font-medium">Role</th>
+                <th className="px-4 py-3 font-medium"></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {admins.map((a) => (
+                <tr key={a.uid} className="border-t border-[#1f232b]/80 hover:bg-[#1f232b]/40">
+                  <td className="px-4 py-3 text-slate-300">{a.email}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`inline-flex items-center rounded-full text-xs px-2.5 py-1 capitalize ${
+                        a.role === "owner"
+                          ? "bg-slate-800/60 text-slate-400"
+                          : "bg-emerald-500/10 text-emerald-400"
+                      }`}
+                    >
+                      {a.role}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {a.role !== "owner" && (
+                      <button
+                        onClick={() => handleRemoveAdmin(a.uid, a.role)}
+                        className="text-rose-400 hover:text-rose-300 text-xs border border-rose-900/60 hover:border-rose-800 px-2.5 py-1 rounded-full"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </main>
     </div>
   );
 }

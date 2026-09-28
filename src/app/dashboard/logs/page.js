@@ -14,6 +14,7 @@ import {
   startAfter,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import Sidebar from "@/components/Sidebar";
 
 const PAGE_SIZE = 25;
 
@@ -94,98 +95,101 @@ export default function LogsPage() {
 
   if (checkingAuth) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+      <div className="min-h-screen bg-[#0a0b0f] text-slate-100 flex items-center justify-center">
         Checking access...
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-4 sm:p-8">
-      <button
-        onClick={() => router.push("/dashboard")}
-        className="text-sm text-neutral-400 hover:text-white mb-6"
-      >
-        ← Back to dashboard
-      </button>
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#0a0b0f] text-slate-100">
+      <Sidebar />
+      <main className="flex-1 p-4 sm:p-8 min-w-0">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-50">Admin Activity Log</h1>
+        <p className="text-slate-500 text-sm mt-1 mb-6">
+          A record of admin actions across the app
+        </p>
 
-      <h1 className="text-2xl font-bold mb-6">Admin Activity Log</h1>
+        {error && (
+          <div className="bg-rose-950/40 border border-rose-900/60 text-rose-300 text-sm rounded-xl px-4 py-3 mb-6 flex flex-wrap items-center justify-between gap-3">
+            <span>{error}</span>
+            <button
+              onClick={() => loadPage(currentPage)}
+              className="text-sm border border-rose-900/60 px-3 py-1.5 rounded-lg hover:text-rose-100 text-rose-300"
+            >
+              Retry
+            </button>
+          </div>
+        )}
 
-      {error && (
-        <div className="bg-red-950 border border-red-800 text-red-300 text-sm rounded-lg px-4 py-3 mb-6 flex flex-wrap items-center justify-between gap-3">
-          <span>{error}</span>
-          <button
-            onClick={() => loadPage(currentPage)}
-            className="text-sm border border-red-800 px-3 py-1.5 rounded-lg hover:text-white text-red-300"
-          >
-            Retry
-          </button>
-        </div>
-      )}
-
-      {loading ? (
-        <p className="text-neutral-400">Loading...</p>
-      ) : logs.length === 0 && !error ? (
-        <p className="text-neutral-500 text-sm">No activity logged yet.</p>
-      ) : logs.length > 0 ? (
-        <>
-          <div className="border border-neutral-800 rounded-xl overflow-hidden overflow-x-auto">
-            <table className="w-full text-left text-sm min-w-[800px]">
-              <thead className="bg-neutral-900 text-neutral-400">
-                <tr>
-                  <th className="px-4 py-3">When</th>
-                  <th className="px-4 py-3">Admin</th>
-                  <th className="px-4 py-3">Action</th>
-                  <th className="px-4 py-3">Collection</th>
-                  <th className="px-4 py-3">Details</th>
-                  <th className="px-4 py-3">User</th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs.map((log) => (
-                  <tr key={log.id} className="border-t border-neutral-800">
-                    <td className="px-4 py-3 whitespace-nowrap">{formatDate(log.timestamp)}</td>
-                    <td className="px-4 py-3">{log.adminEmail}</td>
-                    <td className="px-4 py-3 capitalize">{log.action}</td>
-                    <td className="px-4 py-3">{log.targetCollection || "—"}</td>
-                    <td className="px-4 py-3">{log.details || "—"}</td>
-                    <td className="px-4 py-3">
-                      {log.targetUserId ? (
-                        <button
-                          onClick={() => router.push(`/dashboard/${log.targetUserId}`)}
-                          className="text-blue-400 hover:underline text-xs"
-                        >
-                          View
-                        </button>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
+        {loading ? (
+          <p className="text-slate-500">Loading...</p>
+        ) : logs.length === 0 && !error ? (
+          <div className="bg-[#12141a]/60 border border-[#1f232b] rounded-2xl p-5">
+            <p className="text-slate-500 text-sm">No activity logged yet.</p>
+          </div>
+        ) : logs.length > 0 ? (
+          <>
+            <div className="rounded-2xl border border-[#1f232b] overflow-hidden overflow-x-auto">
+              <table className="w-full text-left text-sm min-w-[800px]">
+                <thead className="bg-[#12141a]/80 text-slate-500 text-xs uppercase">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">When</th>
+                    <th className="px-4 py-3 font-medium">Admin</th>
+                    <th className="px-4 py-3 font-medium">Action</th>
+                    <th className="px-4 py-3 font-medium">Collection</th>
+                    <th className="px-4 py-3 font-medium">Details</th>
+                    <th className="px-4 py-3 font-medium">User</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {logs.map((log) => (
+                    <tr key={log.id} className="border-t border-[#1f232b]/80 hover:bg-[#1f232b]/40">
+                      <td className="px-4 py-3 whitespace-nowrap text-slate-400">
+                        {formatDate(log.timestamp)}
+                      </td>
+                      <td className="px-4 py-3">{log.adminEmail}</td>
+                      <td className="px-4 py-3 capitalize">{log.action}</td>
+                      <td className="px-4 py-3 text-slate-400">{log.targetCollection || "—"}</td>
+                      <td className="px-4 py-3 text-slate-400">{log.details || "—"}</td>
+                      <td className="px-4 py-3">
+                        {log.targetUserId ? (
+                          <button
+                            onClick={() => router.push(`/dashboard/${log.targetUserId}`)}
+                            className="text-xs border border-[#1f232b] px-2.5 py-1 rounded-full text-indigo-400 hover:text-indigo-300 hover:border-indigo-500/50"
+                          >
+                            View
+                          </button>
+                        ) : (
+                          <span className="text-slate-600">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-          <div className="flex justify-between items-center mt-4">
-            <button
-              onClick={() => loadPage(currentPage - 1)}
-              disabled={currentPage === 0}
-              className="text-sm text-neutral-400 hover:text-white border border-neutral-700 px-4 py-2 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              ← Previous
-            </button>
-            <span className="text-neutral-500 text-sm">Page {currentPage + 1}</span>
-            <button
-              onClick={() => loadPage(currentPage + 1)}
-              disabled={!hasNextPage}
-              className="text-sm text-neutral-400 hover:text-white border border-neutral-700 px-4 py-2 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              Next →
-            </button>
-          </div>
-        </>
-      ) : null}
+            <div className="flex justify-between items-center mt-4">
+              <button
+                onClick={() => loadPage(currentPage - 1)}
+                disabled={currentPage === 0}
+                className="text-sm text-slate-300 hover:text-slate-50 border border-[#1f232b] hover:border-indigo-500/50 px-4 py-2 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-[#1f232b]"
+              >
+                ← Previous
+              </button>
+              <span className="text-slate-500 text-sm">Page {currentPage + 1}</span>
+              <button
+                onClick={() => loadPage(currentPage + 1)}
+                disabled={!hasNextPage}
+                className="text-sm text-slate-300 hover:text-slate-50 border border-[#1f232b] hover:border-indigo-500/50 px-4 py-2 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-[#1f232b]"
+              >
+                Next →
+              </button>
+            </div>
+          </>
+        ) : null}
+      </main>
     </div>
   );
 }

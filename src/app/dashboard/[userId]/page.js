@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { logAction } from "@/lib/logAction";
+import Sidebar from "@/components/Sidebar";
 
 export default function UserDetailsPage() {
   const router = useRouter();
@@ -336,352 +337,393 @@ export default function UserDetailsPage() {
 
   if (checkingAuth || loading) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        Loading...
+      <div className="min-h-screen bg-[#0a0b0f] text-slate-100 flex items-center justify-center">
+        Checking access...
       </div>
     );
   }
 
   if (notFound) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <p>User not found.</p>
-      </div>
-    );
-  }
-
-  if (loadError) {
-    return (
-      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center gap-4 p-4">
-        <p className="text-red-400 text-sm">{loadError}</p>
-        <button
-          onClick={fetchAll}
-          className="text-sm border border-neutral-700 px-4 py-2 rounded-lg hover:text-white text-neutral-400"
-        >
-          Retry
-        </button>
+      <div className="flex flex-col lg:flex-row min-h-screen bg-[#0a0b0f] text-slate-100">
+        <Sidebar />
+        <main className="flex-1 p-4 sm:p-8 min-w-0 flex items-center justify-center">
+          <p className="text-slate-500">User not found.</p>
+        </main>
       </div>
     );
   }
 
   const inputClass =
-    "bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-sm w-full";
+    "bg-[#0d0e13] border border-[#1f232b] text-slate-100 rounded-lg px-2 py-1 text-sm w-full focus:outline-none focus:border-indigo-500/60 focus:ring-1 focus:ring-indigo-500/40";
 
   return (
-    <div className="min-h-screen bg-black text-white p-4 sm:p-8">
-      <button
-        onClick={() => router.push("/dashboard")}
-        className="text-sm text-neutral-400 hover:text-white mb-6"
-      >
-        ← Back to all users
-      </button>
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#0a0b0f] text-slate-100">
+      <Sidebar />
+      <main className="flex-1 p-4 sm:p-8 min-w-0">
+        <h1 className="text-2xl font-bold tracking-tight break-words text-slate-50">
+          {user.email || "Unknown user"}
+        </h1>
+        <p className="text-slate-500 text-sm mt-1 mb-6 break-all">User ID: {user.id}</p>
 
-      <h1 className="text-2xl font-bold mb-1 break-words">{user.email || "Unknown user"}</h1>
-      <p className="text-neutral-500 text-sm mb-8 break-all">User ID: {user.id}</p>
-
-      {actionError && (
-        <div className="bg-red-950 border border-red-800 text-red-300 text-sm rounded-lg px-4 py-3 mb-6">
-          {actionError}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10 max-w-md">
-        <div className="border border-neutral-800 rounded-xl p-4">
-          <p className="text-neutral-500 text-xs mb-1">Signed Up</p>
-          <p>{formatFirestoreDate(user.createdAt)}</p>
-        </div>
-        <div className="border border-neutral-800 rounded-xl p-4">
-          <p className="text-neutral-500 text-xs mb-1">Last Seen</p>
-          <p>{formatFirestoreDate(user.lastSeen)}</p>
-        </div>
-      </div>
-
-      {/* Transactions */}
-      <section className="mb-10">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold">
-            Transactions ({transactions.length})
-          </h2>
-          {transactions.length > 0 && (
+        {loadError && (
+          <div className="bg-rose-950/40 border border-rose-900/60 text-rose-300 text-sm rounded-xl px-4 py-3 mb-6 flex flex-wrap items-center justify-between gap-3">
+            <span>{loadError}</span>
             <button
-              onClick={exportTransactionsCsv}
-              className="text-sm text-neutral-400 hover:text-white border border-neutral-700 px-3 py-1.5 rounded-lg"
+              onClick={fetchAll}
+              className="text-sm border border-rose-900/60 px-3 py-1.5 rounded-lg hover:text-rose-100 text-rose-300"
             >
-              Export CSV
+              Retry
             </button>
-          )}
-        </div>
-        {transactions.length === 0 ? (
-          <p className="text-neutral-500 text-sm">No transactions.</p>
-        ) : (
-          <div className="border border-neutral-800 rounded-xl overflow-hidden overflow-x-auto">
-            <table className="w-full text-left text-sm min-w-[800px]">
-              <thead className="bg-neutral-900 text-neutral-400">
-                <tr>
-                  <th className="px-4 py-3">Date</th>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Description</th>
-                  <th className="px-4 py-3">Amount</th>
-                  <th className="px-4 py-3">Category</th>
-                  <th className="px-4 py-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {transactions.map((t) =>
-                  editingTxId === t.id ? (
-                    <tr key={t.id} className="border-t border-neutral-800 bg-neutral-900/50">
-                      <td className="px-4 py-2">
-                        <input
-                          type="datetime-local"
-                          className={inputClass}
-                          value={txDraft.date ? txDraft.date.slice(0, 16) : ""}
-                          onChange={(e) =>
-                            setTxDraft({ ...txDraft, date: new Date(e.target.value).toISOString() })
-                          }
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <input
-                          className={inputClass}
-                          value={txDraft.type}
-                          onChange={(e) => setTxDraft({ ...txDraft, type: e.target.value })}
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <input
-                          className={inputClass}
-                          value={txDraft.description}
-                          onChange={(e) => setTxDraft({ ...txDraft, description: e.target.value })}
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <input
-                          type="number"
-                          className={inputClass}
-                          value={txDraft.amount}
-                          onChange={(e) => setTxDraft({ ...txDraft, amount: e.target.value })}
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <input
-                          className={inputClass}
-                          value={txDraft.category}
-                          onChange={(e) => setTxDraft({ ...txDraft, category: e.target.value })}
-                        />
-                      </td>
-                      <td className="px-4 py-2 whitespace-nowrap">
-                        <button onClick={() => saveEditTx(t.id)} className="text-green-400 text-xs mr-3">
-                          Save
-                        </button>
-                        <button onClick={cancelEditTx} className="text-neutral-400 text-xs">
-                          Cancel
-                        </button>
-                      </td>
-                    </tr>
-                  ) : (
-                    <tr key={t.id} className="border-t border-neutral-800">
-                      <td className="px-4 py-3">{formatIsoDate(t.date)}</td>
-                      <td className="px-4 py-3 capitalize">{t.type}</td>
-                      <td className="px-4 py-3">{t.description}</td>
-                      <td className="px-4 py-3">{t.amount}</td>
-                      <td className="px-4 py-3">{t.category || "—"}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <button onClick={() => startEditTx(t)} className="text-blue-400 text-xs mr-3">
-                          Edit
-                        </button>
-                        <button onClick={() => deleteTx(t.id)} className="text-red-400 text-xs">
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                )}
-              </tbody>
-            </table>
           </div>
         )}
-      </section>
 
-      {/* Stock */}
-      <section className="mb-10">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold">
-            Stock Items ({stockItems.length})
-          </h2>
-          {stockItems.length > 0 && (
-            <button
-              onClick={exportStockCsv}
-              className="text-sm text-neutral-400 hover:text-white border border-neutral-700 px-3 py-1.5 rounded-lg"
-            >
-              Export CSV
-            </button>
-          )}
-        </div>
-        {stockItems.length === 0 ? (
-          <p className="text-neutral-500 text-sm">No stock items.</p>
-        ) : (
-          <div className="border border-neutral-800 rounded-xl overflow-hidden overflow-x-auto">
-            <table className="w-full text-left text-sm min-w-[700px]">
-              <thead className="bg-neutral-900 text-neutral-400">
-                <tr>
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3">Quantity</th>
-                  <th className="px-4 py-3">Cost Price</th>
-                  <th className="px-4 py-3">Selling Price</th>
-                  <th className="px-4 py-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {stockItems.map((s) =>
-                  editingStockId === s.id ? (
-                    <tr key={s.id} className="border-t border-neutral-800 bg-neutral-900/50">
-                      <td className="px-4 py-2">
-                        <input
-                          className={inputClass}
-                          value={stockDraft.name}
-                          onChange={(e) => setStockDraft({ ...stockDraft, name: e.target.value })}
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <input
-                          type="number"
-                          className={inputClass}
-                          value={stockDraft.quantity}
-                          onChange={(e) => setStockDraft({ ...stockDraft, quantity: e.target.value })}
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <input
-                          type="number"
-                          className={inputClass}
-                          value={stockDraft.costPrice}
-                          onChange={(e) => setStockDraft({ ...stockDraft, costPrice: e.target.value })}
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <input
-                          type="number"
-                          className={inputClass}
-                          value={stockDraft.sellingPrice}
-                          onChange={(e) => setStockDraft({ ...stockDraft, sellingPrice: e.target.value })}
-                        />
-                      </td>
-                      <td className="px-4 py-2 whitespace-nowrap">
-                        <button onClick={() => saveEditStock(s.id)} className="text-green-400 text-xs mr-3">
-                          Save
-                        </button>
-                        <button onClick={cancelEditStock} className="text-neutral-400 text-xs">
-                          Cancel
-                        </button>
-                      </td>
-                    </tr>
-                  ) : (
-                    <tr key={s.id} className="border-t border-neutral-800">
-                      <td className="px-4 py-3">{s.name}</td>
-                      <td className="px-4 py-3">{s.quantity}</td>
-                      <td className="px-4 py-3">{s.costPrice}</td>
-                      <td className="px-4 py-3">{s.sellingPrice}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <button onClick={() => startEditStock(s)} className="text-blue-400 text-xs mr-3">
-                          Edit
-                        </button>
-                        <button onClick={() => deleteStock(s.id)} className="text-red-400 text-xs">
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                )}
-              </tbody>
-            </table>
+        {actionError && (
+          <div className="bg-rose-950/40 border border-rose-900/60 text-rose-300 text-sm rounded-xl px-4 py-3 mb-6">
+            {actionError}
           </div>
         )}
-      </section>
 
-      {/* Contacts */}
-      <section className="mb-10">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold">
-            Contacts ({contacts.length})
-          </h2>
-          {contacts.length > 0 && (
-            <button
-              onClick={exportContactsCsv}
-              className="text-sm text-neutral-400 hover:text-white border border-neutral-700 px-3 py-1.5 rounded-lg"
-            >
-              Export CSV
-            </button>
-          )}
-        </div>
-        {contacts.length === 0 ? (
-          <p className="text-neutral-500 text-sm">No contacts.</p>
-        ) : (
-          <div className="border border-neutral-800 rounded-xl overflow-hidden overflow-x-auto">
-            <table className="w-full text-left text-sm min-w-[550px]">
-              <thead className="bg-neutral-900 text-neutral-400">
-                <tr>
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3">Phone</th>
-                  <th className="px-4 py-3">Balance</th>
-                  <th className="px-4 py-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {contacts.map((c) =>
-                  editingContactId === c.id ? (
-                    <tr key={c.id} className="border-t border-neutral-800 bg-neutral-900/50">
-                      <td className="px-4 py-2">
-                        <input
-                          className={inputClass}
-                          value={contactDraft.name}
-                          onChange={(e) => setContactDraft({ ...contactDraft, name: e.target.value })}
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <input
-                          className={inputClass}
-                          value={contactDraft.phone}
-                          onChange={(e) => setContactDraft({ ...contactDraft, phone: e.target.value })}
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <input
-                          type="number"
-                          className={inputClass}
-                          value={contactDraft.balance}
-                          onChange={(e) => setContactDraft({ ...contactDraft, balance: e.target.value })}
-                        />
-                      </td>
-                      <td className="px-4 py-2 whitespace-nowrap">
-                        <button onClick={() => saveEditContact(c.id)} className="text-green-400 text-xs mr-3">
-                          Save
-                        </button>
-                        <button onClick={cancelEditContact} className="text-neutral-400 text-xs">
-                          Cancel
-                        </button>
-                      </td>
-                    </tr>
-                  ) : (
-                    <tr key={c.id} className="border-t border-neutral-800">
-                      <td className="px-4 py-3">{c.name}</td>
-                      <td className="px-4 py-3">{c.phone || "—"}</td>
-                      <td className="px-4 py-3">{c.balance}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <button onClick={() => startEditContact(c)} className="text-blue-400 text-xs mr-3">
-                          Edit
-                        </button>
-                        <button onClick={() => deleteContact(c.id)} className="text-red-400 text-xs">
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                )}
-              </tbody>
-            </table>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10 max-w-md">
+          <div className="bg-[#12141a]/60 border border-[#1f232b] rounded-2xl p-5">
+            <p className="text-slate-500 text-xs mb-1">Signed Up</p>
+            <p className="text-slate-100">{formatFirestoreDate(user.createdAt)}</p>
           </div>
-        )}
-      </section>
+          <div className="bg-[#12141a]/60 border border-[#1f232b] rounded-2xl p-5">
+            <p className="text-slate-500 text-xs mb-1">Last Seen</p>
+            <p className="text-slate-100">{formatFirestoreDate(user.lastSeen)}</p>
+          </div>
+        </div>
+
+        {/* Transactions */}
+        <section className="mb-10">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-slate-50">
+              Transactions ({transactions.length})
+            </h2>
+            {transactions.length > 0 && (
+              <button
+                onClick={exportTransactionsCsv}
+                className="text-sm text-slate-300 hover:text-slate-100 border border-[#1f232b] hover:border-slate-600 px-3 py-1.5 rounded-lg"
+              >
+                Export CSV
+              </button>
+            )}
+          </div>
+          {transactions.length === 0 ? (
+            <div className="bg-[#12141a]/60 border border-[#1f232b] rounded-2xl p-5">
+              <p className="text-slate-500 text-sm">No transactions.</p>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-[#1f232b] overflow-hidden overflow-x-auto">
+              <table className="w-full text-left text-sm min-w-[800px]">
+                <thead className="bg-[#12141a]/80 text-slate-500 text-xs uppercase">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Date</th>
+                    <th className="px-4 py-3 font-medium">Type</th>
+                    <th className="px-4 py-3 font-medium">Description</th>
+                    <th className="px-4 py-3 font-medium">Amount</th>
+                    <th className="px-4 py-3 font-medium">Category</th>
+                    <th className="px-4 py-3 font-medium"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactions.map((t) =>
+                    editingTxId === t.id ? (
+                      <tr key={t.id} className="border-t border-[#1f232b]/80 bg-[#1f232b]/40">
+                        <td className="px-4 py-2">
+                          <input
+                            type="datetime-local"
+                            className={inputClass}
+                            value={txDraft.date ? txDraft.date.slice(0, 16) : ""}
+                            onChange={(e) =>
+                              setTxDraft({ ...txDraft, date: new Date(e.target.value).toISOString() })
+                            }
+                          />
+                        </td>
+                        <td className="px-4 py-2">
+                          <input
+                            className={inputClass}
+                            value={txDraft.type}
+                            onChange={(e) => setTxDraft({ ...txDraft, type: e.target.value })}
+                          />
+                        </td>
+                        <td className="px-4 py-2">
+                          <input
+                            className={inputClass}
+                            value={txDraft.description}
+                            onChange={(e) => setTxDraft({ ...txDraft, description: e.target.value })}
+                          />
+                        </td>
+                        <td className="px-4 py-2">
+                          <input
+                            type="number"
+                            className={inputClass}
+                            value={txDraft.amount}
+                            onChange={(e) => setTxDraft({ ...txDraft, amount: e.target.value })}
+                          />
+                        </td>
+                        <td className="px-4 py-2">
+                          <input
+                            className={inputClass}
+                            value={txDraft.category}
+                            onChange={(e) => setTxDraft({ ...txDraft, category: e.target.value })}
+                          />
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          <button
+                            onClick={() => saveEditTx(t.id)}
+                            className="text-xs text-white bg-indigo-500 px-2.5 py-1 rounded-full mr-2 hover:bg-indigo-400"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={cancelEditTx}
+                            className="text-xs text-slate-300 border border-[#1f232b] px-2.5 py-1 rounded-full hover:text-slate-100 hover:border-slate-600"
+                          >
+                            Cancel
+                          </button>
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr key={t.id} className="border-t border-[#1f232b]/80 hover:bg-[#1f232b]/40">
+                        <td className="px-4 py-3 whitespace-nowrap text-slate-500">{formatIsoDate(t.date)}</td>
+                        <td className="px-4 py-3 capitalize text-slate-300">{t.type}</td>
+                        <td className="px-4 py-3 text-slate-300">{t.description}</td>
+                        <td className="px-4 py-3 text-slate-300">{t.amount}</td>
+                        <td className="px-4 py-3 text-slate-500">{t.category || "—"}</td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <button
+                            onClick={() => startEditTx(t)}
+                            className="text-xs text-slate-300 border border-[#1f232b] px-2.5 py-1 rounded-full mr-2 hover:text-slate-100 hover:border-slate-600"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => deleteTx(t.id)}
+                            className="text-xs text-rose-400 border border-rose-900/60 px-2.5 py-1 rounded-full hover:text-rose-300 hover:border-rose-800"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        {/* Stock */}
+        <section className="mb-10">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-slate-50">
+              Stock Items ({stockItems.length})
+            </h2>
+            {stockItems.length > 0 && (
+              <button
+                onClick={exportStockCsv}
+                className="text-sm text-slate-300 hover:text-slate-100 border border-[#1f232b] hover:border-slate-600 px-3 py-1.5 rounded-lg"
+              >
+                Export CSV
+              </button>
+            )}
+          </div>
+          {stockItems.length === 0 ? (
+            <div className="bg-[#12141a]/60 border border-[#1f232b] rounded-2xl p-5">
+              <p className="text-slate-500 text-sm">No stock items.</p>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-[#1f232b] overflow-hidden overflow-x-auto">
+              <table className="w-full text-left text-sm min-w-[700px]">
+                <thead className="bg-[#12141a]/80 text-slate-500 text-xs uppercase">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Name</th>
+                    <th className="px-4 py-3 font-medium">Quantity</th>
+                    <th className="px-4 py-3 font-medium">Cost Price</th>
+                    <th className="px-4 py-3 font-medium">Selling Price</th>
+                    <th className="px-4 py-3 font-medium"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stockItems.map((s) =>
+                    editingStockId === s.id ? (
+                      <tr key={s.id} className="border-t border-[#1f232b]/80 bg-[#1f232b]/40">
+                        <td className="px-4 py-2">
+                          <input
+                            className={inputClass}
+                            value={stockDraft.name}
+                            onChange={(e) => setStockDraft({ ...stockDraft, name: e.target.value })}
+                          />
+                        </td>
+                        <td className="px-4 py-2">
+                          <input
+                            type="number"
+                            className={inputClass}
+                            value={stockDraft.quantity}
+                            onChange={(e) => setStockDraft({ ...stockDraft, quantity: e.target.value })}
+                          />
+                        </td>
+                        <td className="px-4 py-2">
+                          <input
+                            type="number"
+                            className={inputClass}
+                            value={stockDraft.costPrice}
+                            onChange={(e) => setStockDraft({ ...stockDraft, costPrice: e.target.value })}
+                          />
+                        </td>
+                        <td className="px-4 py-2">
+                          <input
+                            type="number"
+                            className={inputClass}
+                            value={stockDraft.sellingPrice}
+                            onChange={(e) => setStockDraft({ ...stockDraft, sellingPrice: e.target.value })}
+                          />
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          <button
+                            onClick={() => saveEditStock(s.id)}
+                            className="text-xs text-white bg-indigo-500 px-2.5 py-1 rounded-full mr-2 hover:bg-indigo-400"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={cancelEditStock}
+                            className="text-xs text-slate-300 border border-[#1f232b] px-2.5 py-1 rounded-full hover:text-slate-100 hover:border-slate-600"
+                          >
+                            Cancel
+                          </button>
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr key={s.id} className="border-t border-[#1f232b]/80 hover:bg-[#1f232b]/40">
+                        <td className="px-4 py-3 text-slate-300">{s.name}</td>
+                        <td className="px-4 py-3 text-slate-300">{s.quantity}</td>
+                        <td className="px-4 py-3 text-slate-300">{s.costPrice}</td>
+                        <td className="px-4 py-3 text-slate-300">{s.sellingPrice}</td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <button
+                            onClick={() => startEditStock(s)}
+                            className="text-xs text-slate-300 border border-[#1f232b] px-2.5 py-1 rounded-full mr-2 hover:text-slate-100 hover:border-slate-600"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => deleteStock(s.id)}
+                            className="text-xs text-rose-400 border border-rose-900/60 px-2.5 py-1 rounded-full hover:text-rose-300 hover:border-rose-800"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        {/* Contacts */}
+        <section className="mb-10">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-slate-50">
+              Contacts ({contacts.length})
+            </h2>
+            {contacts.length > 0 && (
+              <button
+                onClick={exportContactsCsv}
+                className="text-sm text-slate-300 hover:text-slate-100 border border-[#1f232b] hover:border-slate-600 px-3 py-1.5 rounded-lg"
+              >
+                Export CSV
+              </button>
+            )}
+          </div>
+          {contacts.length === 0 ? (
+            <div className="bg-[#12141a]/60 border border-[#1f232b] rounded-2xl p-5">
+              <p className="text-slate-500 text-sm">No contacts.</p>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-[#1f232b] overflow-hidden overflow-x-auto">
+              <table className="w-full text-left text-sm min-w-[550px]">
+                <thead className="bg-[#12141a]/80 text-slate-500 text-xs uppercase">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Name</th>
+                    <th className="px-4 py-3 font-medium">Phone</th>
+                    <th className="px-4 py-3 font-medium">Balance</th>
+                    <th className="px-4 py-3 font-medium"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {contacts.map((c) =>
+                    editingContactId === c.id ? (
+                      <tr key={c.id} className="border-t border-[#1f232b]/80 bg-[#1f232b]/40">
+                        <td className="px-4 py-2">
+                          <input
+                            className={inputClass}
+                            value={contactDraft.name}
+                            onChange={(e) => setContactDraft({ ...contactDraft, name: e.target.value })}
+                          />
+                        </td>
+                        <td className="px-4 py-2">
+                          <input
+                            className={inputClass}
+                            value={contactDraft.phone}
+                            onChange={(e) => setContactDraft({ ...contactDraft, phone: e.target.value })}
+                          />
+                        </td>
+                        <td className="px-4 py-2">
+                          <input
+                            type="number"
+                            className={inputClass}
+                            value={contactDraft.balance}
+                            onChange={(e) => setContactDraft({ ...contactDraft, balance: e.target.value })}
+                          />
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          <button
+                            onClick={() => saveEditContact(c.id)}
+                            className="text-xs text-white bg-indigo-500 px-2.5 py-1 rounded-full mr-2 hover:bg-indigo-400"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={cancelEditContact}
+                            className="text-xs text-slate-300 border border-[#1f232b] px-2.5 py-1 rounded-full hover:text-slate-100 hover:border-slate-600"
+                          >
+                            Cancel
+                          </button>
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr key={c.id} className="border-t border-[#1f232b]/80 hover:bg-[#1f232b]/40">
+                        <td className="px-4 py-3 text-slate-300">{c.name}</td>
+                        <td className="px-4 py-3 text-slate-500">{c.phone || "—"}</td>
+                        <td className="px-4 py-3 text-slate-300">{c.balance}</td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <button
+                            onClick={() => startEditContact(c)}
+                            className="text-xs text-slate-300 border border-[#1f232b] px-2.5 py-1 rounded-full mr-2 hover:text-slate-100 hover:border-slate-600"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => deleteContact(c.id)}
+                            className="text-xs text-rose-400 border border-rose-900/60 px-2.5 py-1 rounded-full hover:text-rose-300 hover:border-rose-800"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </main>
     </div>
   );
 }

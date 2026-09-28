@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import {
@@ -16,6 +16,8 @@ import {
   where,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import Sidebar from "@/components/Sidebar";
+import { Search, LogOut, ChevronLeft, ChevronRight } from "lucide-react";
 
 const PAGE_SIZE = 25;
 
@@ -31,6 +33,7 @@ export default function DashboardPage() {
   const [pageCursors, setPageCursors] = useState([null]);
   const [currentPage, setCurrentPage] = useState(0);
   const [hasNextPage, setHasNextPage] = useState(false);
+  const currentPageRef = useRef(0);
 
   const [searchInput, setSearchInput] = useState("");
   const [searchActive, setSearchActive] = useState(false);
@@ -91,6 +94,10 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
+    currentPageRef.current = currentPage;
+  }, [currentPage]);
+
+  useEffect(() => {
     if (checkingAuth) return;
 
     getCountFromServer(collection(db, "users"))
@@ -100,7 +107,7 @@ export default function DashboardPage() {
     loadPage(0, [null]);
 
     const interval = setInterval(() => {
-      if (!searchActive) loadPage(currentPage);
+      if (!searchActive) loadPage(currentPageRef.current);
     }, 30000);
     return () => clearInterval(interval);
   }, [checkingAuth]);
@@ -170,7 +177,7 @@ export default function DashboardPage() {
 
   if (checkingAuth) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+      <div className="min-h-screen bg-[#0a0b0f] text-slate-100 flex items-center justify-center">
         Checking access...
       </div>
     );
@@ -179,160 +186,167 @@ export default function DashboardPage() {
   const displayedUsers = searchActive ? searchResults : users;
 
   return (
-    <div className="min-h-screen bg-black text-white p-4 sm:p-8">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Steadia Admin</h1>
-          <p className="text-neutral-400 text-sm">
-            {totalCount === null ? "Loading total..." : `${totalCount} total users`}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <button
-            onClick={() => router.push("/dashboard/analytics")}
-            className="text-sm text-neutral-400 hover:text-white border border-neutral-700 px-4 py-2 rounded-lg"
-          >
-            Analytics
-          </button>
-          <button
-            onClick={() => router.push("/dashboard/inactive")}
-            className="text-sm text-neutral-400 hover:text-white border border-neutral-700 px-4 py-2 rounded-lg"
-          >
-            Inactive Users
-          </button>
-          {isOwner && (
-            <button
-              onClick={() => router.push("/dashboard/admins")}
-              className="text-sm text-neutral-400 hover:text-white border border-neutral-700 px-4 py-2 rounded-lg"
-            >
-              Manage Admins
-            </button>
-          )}
-          {isOwner && (
-            <button
-              onClick={() => router.push("/dashboard/logs")}
-              className="text-sm text-neutral-400 hover:text-white border border-neutral-700 px-4 py-2 rounded-lg"
-            >
-              View Logs
-            </button>
-          )}
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#0a0b0f] text-slate-100">
+      <Sidebar />
+      <main className="flex-1 p-4 sm:p-8 min-w-0">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-50">Steadia Admin</h1>
+            <p className="text-slate-500 text-sm mt-1">
+              {totalCount === null
+                ? "Loading total..."
+                : `${totalCount} total users`}
+            </p>
+          </div>
           <button
             onClick={handleSignOut}
-            className="text-sm text-neutral-400 hover:text-white border border-neutral-700 px-4 py-2 rounded-lg"
+            className="inline-flex items-center gap-2 text-sm text-slate-300 hover:text-slate-50 border border-[#1f232b] hover:bg-[#1f232b]/60 px-4 py-2 rounded-full transition-colors"
           >
+            <LogOut size={15} />
             Sign Out
           </button>
         </div>
-      </div>
 
-      {error && (
-        <div className="bg-red-950 border border-red-800 text-red-300 text-sm rounded-lg px-4 py-3 mb-6">
-          {error}
-        </div>
-      )}
-
-      <form onSubmit={handleSearch} className="flex flex-wrap gap-2 mb-6 max-w-md">
-        <input
-          type="text"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="Search by email..."
-          className="flex-1 min-w-[150px] bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-sm"
-        />
-        <button
-          type="submit"
-          disabled={searching}
-          className="bg-white text-black px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
-        >
-          {searching ? "Searching..." : "Search"}
-        </button>
-        {searchActive && (
-          <button
-            type="button"
-            onClick={clearSearch}
-            className="text-sm text-neutral-400 hover:text-white border border-neutral-700 px-4 py-2 rounded-lg"
-          >
-            Clear
-          </button>
-        )}
-      </form>
-
-      {searchError && (
-        <div className="bg-red-950 border border-red-800 text-red-300 text-sm rounded-lg px-4 py-3 mb-6 max-w-md">
-          {searchError}
-        </div>
-      )}
-
-      {loading && !searchActive ? (
-        <p className="text-neutral-400">Loading...</p>
-      ) : (
-        <>
-          {searchActive && (
-            <p className="text-neutral-500 text-sm mb-3">
-              {searchResults.length} result{searchResults.length !== 1 ? "s" : ""} for &quot;{searchInput}&quot;
-            </p>
-          )}
-
-          <div className="border border-neutral-800 rounded-xl overflow-hidden overflow-x-auto">
-            <table className="w-full text-left text-sm min-w-[650px]">
-              <thead className="bg-neutral-900 text-neutral-400">
-                <tr>
-                  <th className="px-4 py-3">Email</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Signed Up</th>
-                  <th className="px-4 py-3">Last Seen</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayedUsers.map((user) => (
-                  <tr
-                    key={user.id}
-                    onClick={() => router.push(`/dashboard/${user.id}`)}
-                    className="border-t border-neutral-800 hover:bg-neutral-900 cursor-pointer"
-                  >
-                    <td className="px-4 py-3">{user.email || "—"}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span
-                        className={`inline-block w-2 h-2 rounded-full mr-2 ${
-                          isOnline(user.lastActive) ? "bg-green-500" : "bg-neutral-600"
-                        }`}
-                      ></span>
-                      {isOnline(user.lastActive) ? "Online" : "Offline"}
-                      {isInactive(user.lastSeen) && (
-                        <span className="ml-2 text-xs bg-orange-900/40 text-orange-400 px-2 py-0.5 rounded-full">
-                          Inactive
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">{formatDate(user.createdAt)}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">{formatDate(user.lastSeen)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {error && (
+          <div className="bg-rose-950/40 border border-rose-900/60 text-rose-300 text-sm rounded-xl px-4 py-3 mb-6">
+            {error}
           </div>
+        )}
 
-          {!searchActive && (
-            <div className="flex justify-between items-center mt-4">
+        <div className="bg-[#12141a]/60 border border-[#1f232b] rounded-2xl p-5 mb-6">
+          <form
+            onSubmit={handleSearch}
+            className="flex flex-wrap items-center gap-2"
+          >
+            <div className="relative flex-1 min-w-[180px]">
+              <Search
+                size={15}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600"
+              />
+              <input
+                type="text"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Search by email..."
+                className="w-full bg-[#0d0e13] border border-[#1f232b] rounded-full pl-9 pr-4 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500/60 focus:ring-1 focus:ring-indigo-500/40"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={searching}
+              className="bg-indigo-500 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-indigo-400 disabled:opacity-50 transition-colors"
+            >
+              {searching ? "Searching..." : "Search"}
+            </button>
+            {searchActive && (
               <button
-                onClick={() => loadPage(currentPage - 1)}
-                disabled={currentPage === 0}
-                className="text-sm text-neutral-400 hover:text-white border border-neutral-700 px-4 py-2 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed"
+                type="button"
+                onClick={clearSearch}
+                className="text-sm text-slate-300 hover:text-slate-50 border border-[#1f232b] hover:bg-[#1f232b]/60 px-4 py-2 rounded-full transition-colors"
               >
-                ← Previous
+                Clear
               </button>
-              <span className="text-neutral-500 text-sm">Page {currentPage + 1}</span>
-              <button
-                onClick={() => loadPage(currentPage + 1)}
-                disabled={!hasNextPage}
-                className="text-sm text-neutral-400 hover:text-white border border-neutral-700 px-4 py-2 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                Next →
-              </button>
+            )}
+          </form>
+
+          {searchError && (
+            <div className="bg-rose-950/40 border border-rose-900/60 text-rose-300 text-sm rounded-xl px-4 py-3 mt-4">
+              {searchError}
             </div>
           )}
-        </>
-      )}
+        </div>
+
+        {loading && !searchActive ? (
+          <p className="text-slate-500 text-sm">Loading...</p>
+        ) : (
+          <>
+            {searchActive && (
+              <p className="text-slate-500 text-sm mb-3">
+                {searchResults.length} result
+                {searchResults.length !== 1 ? "s" : ""} for &quot;{searchInput}
+                &quot;
+              </p>
+            )}
+
+            <div className="border border-[#1f232b] rounded-2xl overflow-hidden overflow-x-auto">
+              <table className="w-full text-left text-sm min-w-[650px]">
+                <thead className="bg-[#12141a]/80 text-slate-500 text-xs uppercase tracking-wide">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Email</th>
+                    <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium">Signed Up</th>
+                    <th className="px-4 py-3 font-medium">Last Seen</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayedUsers.map((user) => (
+                    <tr
+                      key={user.id}
+                      onClick={() => router.push(`/dashboard/${user.id}`)}
+                      className="border-t border-[#1f232b]/80 hover:bg-[#1f232b]/40 cursor-pointer transition-colors"
+                    >
+                      <td className="px-4 py-3">{user.email || "—"}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full ${
+                            isOnline(user.lastActive)
+                              ? "bg-emerald-500/10 text-emerald-400"
+                              : "bg-slate-800/60 text-slate-400"
+                          }`}
+                        >
+                          <span
+                            className={`inline-block w-1.5 h-1.5 rounded-full ${
+                              isOnline(user.lastActive)
+                                ? "bg-emerald-500"
+                                : "bg-slate-600"
+                            }`}
+                          ></span>
+                          {isOnline(user.lastActive) ? "Online" : "Offline"}
+                        </span>
+                        {isInactive(user.lastSeen) && (
+                          <span className="ml-2 text-xs bg-amber-500/10 text-amber-400 px-2.5 py-1 rounded-full">
+                            Inactive
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-slate-300">
+                        {formatDate(user.createdAt)}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-slate-300">
+                        {formatDate(user.lastSeen)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {!searchActive && (
+              <div className="flex justify-between items-center mt-4">
+                <button
+                  onClick={() => loadPage(currentPage - 1)}
+                  disabled={currentPage === 0}
+                  className="inline-flex items-center gap-1.5 text-sm text-slate-300 hover:text-slate-50 border border-[#1f232b] hover:bg-[#1f232b]/60 px-4 py-2 rounded-full disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors"
+                >
+                  <ChevronLeft size={15} />
+                  Previous
+                </button>
+                <span className="text-slate-500 text-sm">
+                  Page {currentPage + 1}
+                </span>
+                <button
+                  onClick={() => loadPage(currentPage + 1)}
+                  disabled={!hasNextPage}
+                  className="inline-flex items-center gap-1.5 text-sm text-slate-300 hover:text-slate-50 border border-[#1f232b] hover:bg-[#1f232b]/60 px-4 py-2 rounded-full disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors"
+                >
+                  Next
+                  <ChevronRight size={15} />
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </main>
     </div>
   );
 }
