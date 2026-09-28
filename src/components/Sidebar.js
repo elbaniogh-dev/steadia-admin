@@ -11,6 +11,7 @@ import {
   UserX,
   ScrollText,
   ShieldCheck,
+  Bell,
   LogOut,
   Menu,
   X,
@@ -20,6 +21,7 @@ const navItems = [
   { href: "/dashboard", label: "Users", icon: LayoutDashboard, ownerOnly: false },
   { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3, ownerOnly: false },
   { href: "/dashboard/inactive", label: "Inactive Users", icon: UserX, ownerOnly: false },
+  { href: "/dashboard/notifications", label: "Notifications", icon: Bell, ownerOnly: false },
   { href: "/dashboard/logs", label: "Activity Log", icon: ScrollText, ownerOnly: true },
   { href: "/dashboard/admins", label: "Manage Admins", icon: ShieldCheck, ownerOnly: true },
 ];
